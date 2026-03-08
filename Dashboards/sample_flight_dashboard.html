@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Service Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; font-size: 13px; color: #333; }
+
+  /* HEADER */
+  .header {
+    background: #1565c0;
+    color: white;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 { font-size: 16px; font-weight: 600; }
+  .header-actions { display: flex; gap: 6px; align-items: center; }
+  .btn-filter {
+    background: white; color: #1565c0; border: none; padding: 4px 10px;
+    border-radius: 3px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+  .icon-btn {
+    width: 26px; height: 26px; border-radius: 3px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .icon-btn.green { background: #2e7d32; color: white; }
+  .icon-btn.red { background: #c62828; color: white; }
+  .icon-btn.yellow { background: #f9a825; color: white; }
+
+  /* TABS */
+  .tabs {
+    background: white;
+    border-bottom: 1px solid #ddd;
+    padding: 0 16px;
+    display: flex;
+    gap: 0;
+  }
+  .tab {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #555;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+  .tab.active { color: #1565c0; border-bottom-color: #1565c0; font-weight: 500; }
+
+  /* TAB CONTENT */
+  .tab-content { display: none; padding: 12px; }
+  .tab-content.active { display: block; }
+
+  /* CARDS GRID */
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .metrics-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .charts-row-full { margin-bottom: 10px; }
+
+  /* METRIC CARD */
+  .metric-card {
+    background: white;
+    border-radius: 4px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .metric-label { font-size: 11px; color: #666; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+  .metric-value { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+  .metric-value.medium { font-size: 18px; }
+  .metric-change { font-size: 11px; display: flex; align-items: center; gap: 3px; }
+  .metric-change.down { color: #c62828; }
+  .metric-change.up { color: #2e7d32; }
+  .metric-sparkline-wrap { height: 36px; margin: 6px 0; position: relative; overflow: hidden; }
+  .metric-sparkline { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
+  .view-insights {
+    font-size: 11px; color: #1565c0; background: white; border: 1px solid #1565c0;
+    padding: 2px 7px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+
+  /* CHART CARD */
+  .chart-card {
+    background: white;
+    border-radius: 4px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .chart-card-title {
+    font-size: 12px; font-weight: 600; color: #333; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chart-container { position: relative; }
+
+  /* LEGEND */
+  .legend { display: flex; gap: 12px; align-items: center; font-size: 11px; color: #555; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+  /* BOOKING METRIC CARD with icon */
+  .booking-metric {
+    background: white;
+    border-radius: 4px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+  }
+  .booking-metric .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .booking-metric .icon-box {
+    width: 44px; height: 44px; border-radius: 6px; display: flex; align-items: center;
+    justify-content: center; font-size: 20px; background: #fff3e0;
+  }
+  .booking-metric .icon-box.blue { background: #e3f2fd; }
+  .booking-metric .icon-box.green { background: #e8f5e9; }
+  .booking-metric .icon-box.red { background: #fce4ec; }
+  .booking-metric .icon-box.orange { background: #fff3e0; }
+  .booking-metric .icon-box.teal { background: #e0f2f1; }
+  .booking-metric .icon-box.purple { background: #f3e5f5; }
+
+  /* TOGGLE BUTTONS */
+  .toggle-group { display: flex; gap: 0; }
+  .toggle-btn {
+    font-size: 11px; padding: 3px 8px; cursor: pointer; border: 1px solid #1565c0;
+    background: white; color: #1565c0;
+  }
+  .toggle-btn.active { background: #1565c0; color: white; }
+  .toggle-btn:first-child { border-radius: 3px 0 0 3px; }
+  .toggle-btn:last-child { border-radius: 0 3px 3px 0; }
+
+  /* TREND HIGHLIGHTS */
+  .trend-highlight-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .highlight-card {
+    background: white; border-radius: 4px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    text-align: center;
+  }
+  .highlight-card .hl-label { font-size: 11px; color: #888; margin-bottom: 6px; }
+  .highlight-card .hl-value { font-size: 20px; font-weight: 700; color: #222; }
+  .highlight-card .hl-sub { font-size: 12px; color: #555; }
+  .route-box { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .route-city { font-size: 14px; font-weight: 700; }
+  .route-icon { font-size: 22px; color: #1565c0; }
+  .stopover-box {
+    background: white; border-radius: 4px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: grid; grid-template-columns: 1fr 1fr; text-align: center;
+  }
+  .stopover-box .sv { font-size: 22px; font-weight: 700; }
+  .stopover-box .sv.orange { color: #e65100; }
+  .stopover-box .sv.blue { color: #1565c0; }
+  .stopover-box .sl { font-size: 11px; color: #888; }
+  .stopover-box .divider { border-left: 1px solid #ddd; }
+
+  /* INFO ICON */
+  .info-icon { width: 16px; height: 16px; border-radius: 50%; background: #90a4ae; color: white; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  canvas { max-width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>✈ Flight Service Report</h1>
+  <div class="header-actions">
+    <button class="btn-filter">Filter ▽</button>
+    <button class="icon-btn green">XL</button>
+    <button class="icon-btn red">PDF</button>
+    <button class="icon-btn yellow">↑</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('financial')">Financial Overview</div>
+  <div class="tab" onclick="showTab('booking')">Booking Overview</div>
+  <div class="tab" onclick="showTab('trends')">Booking Trends and Insights</div>
+</div>
+
+<!-- ===== TAB 1: FINANCIAL OVERVIEW ===== -->
+<div id="tab-financial" class="tab-content active">
+
+  <!-- Metric Cards Row 1 -->
+  <div class="metrics-grid">
+    <!-- Gross Booking Value -->
+    <div class="metric-card">
+      <div class="metric-label">Gross Booking Value <span style="display:flex;gap:6px;align-items:center;"><button class="view-insights">View Insights</button><span class="info-icon">i</span></span></div>
+      <div class="metric-value">USD 31.7M</div>
+      <div class="metric-sparkline-wrap"><canvas id="spark1" class="metric-sparkline"></canvas></div>
+      <div class="metric-change down">▼ -18.34% vs last year</div>
+    </div>
+    <!-- Total Revenue -->
+    <div class="metric-card">
+      <div class="metric-label">Total Revenue <span style="display:flex;gap:6px;align-items:center;"><button class="view-insights">View Insights</button><span class="info-icon">i</span></span></div>
+      <div class="metric-value">USD 2.1M</div>
+      <div class="metric-sparkline-wrap"><canvas id="spark2" class="metric-sparkline"></canvas></div>
+      <div class="metric-change down">▼ -19.82% vs last year</div>
+    </div>
+    <!-- Profit Margin -->
+    <div class="metric-card">
+      <div class="metric-label">Profit Margin <span style="display:flex;gap:6px;align-items:center;"><button class="view-insights">View Insights</button><span class="info-icon">i</span></span></div>
+      <div class="metric-value">7.8%</div>
+      <div class="metric-sparkline-wrap"><canvas id="spark3" class="metric-sparkline"></canvas></div>
+      <div class="metric-change down">▼ -2.11% vs last year</div>
+    </div>
+    <!-- Total Supplier Payment -->
+    <div class="metric-card">
+      <div class="metric-label">Total Supplier Payment <span style="display:flex;gap:6px;align-items:center;"><button class="view-insights">View Insights</button><span class="info-icon">i</span></span></div>
+      <div class="metric-value">USD 29.6M</div>
+      <div class="metric-sparkline-wrap"><canvas id="spark4" class="metric-sparkline"></canvas></div>
+      <div class="metric-change down">▼ -18.91% vs last year</div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="charts-row">
+    <!-- Top 5 Orgs by Revenue -->
+    <div class="chart-card">
+      <div class="chart-card-title">Top 5 Organizations By Revenue</div>
+      <div class="chart-container" style="height:160px;">
+        <canvas id="orgRevenueChart"></canvas>
+      </div>
+    </div>
+    <!-- Channel-Wise Breakdown -->
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Channel-Wise Breakdown
+        <div class="legend">
+          <span><span class="legend-dot" style="background:#1565c0;"></span> B2C</span>
+          <span><span class="legend-dot" style="background:#f9a825;"></span> Corporate</span>
+          <span><span class="legend-dot" style="background:#aaa;"></span> Reseller</span>
+        </div>
+      </div>
+      <div class="chart-container" style="height:160px;">
+        <canvas id="channelChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Online vs Offline / Domestic vs International -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Online vs Offline
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#2e7d32;"></span> Online</span>
+            <span><span class="legend-dot" style="background:#c62828;"></span> Offline</span>
+          </div>
+          <button class="view-insights">View Insights</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:120px;">
+        <canvas id="onlineOfflineChart"></canvas>
+      </div>
+      <div style="font-size:11px;color:#888;margin-top:4px;">Total Revenue</div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Domestic vs International
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#aaa;"></span> Domestic</span>
+            <span><span class="legend-dot" style="background:#f9a825;"></span> International</span>
+          </div>
+          <button class="view-insights">View Insights</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:120px;">
+        <canvas id="domIntlChart"></canvas>
+      </div>
+      <div style="font-size:11px;color:#888;margin-top:4px;">Total Revenue</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 2: BOOKING OVERVIEW ===== -->
+<div id="tab-booking" class="tab-content">
+  <div class="metrics-grid-3">
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Processed Bookings <span class="info-icon">i</span></div>
+          <div class="metric-value medium">19,284</div>
+          <div class="metric-change down">▼ -5.22% vs last year</div>
+        </div>
+        <div class="icon-box blue">🛫</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Successful Bookings <span class="info-icon">i</span></div>
+          <div class="metric-value medium">16,419</div>
+          <div class="metric-change down">▼ -8.74% vs last year</div>
+        </div>
+        <div class="icon-box green">✅</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Failed Bookings <span class="info-icon">i</span></div>
+          <div class="metric-value medium">37</div>
+          <div class="metric-change up">▲ 0.19% vs last year</div>
+        </div>
+        <div class="icon-box red">❌</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Payments Done Tickets Failed <span class="info-icon">i</span></div>
+          <div class="metric-value medium">5</div>
+          <div class="metric-change down">▼ -71.43% vs last year</div>
+        </div>
+        <div class="icon-box orange">⚠️</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Total Imported Bookings <span class="info-icon">i</span></div>
+          <div class="metric-value medium">7,142</div>
+          <div class="metric-change down">▼ -24.13% vs last year</div>
+        </div>
+        <div class="icon-box teal">📥</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Total Passengers <span class="info-icon">i</span></div>
+          <div class="metric-value medium">15,876</div>
+          <div class="metric-change down">▼ -27.38% vs last year</div>
+        </div>
+        <div class="icon-box purple">👥</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Cancelled Bookings <span class="info-icon">i</span></div>
+          <div class="metric-value medium">1,384</div>
+          <div class="metric-change down">▼ -31.44% vs last year</div>
+        </div>
+        <div class="icon-box red">🚫</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Changed Bookings <span class="info-icon">i</span></div>
+          <div class="metric-value medium">1,309</div>
+          <div class="metric-change down">▼ -28.77% vs last year</div>
+        </div>
+        <div class="icon-box blue">🔄</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+    <div class="booking-metric">
+      <div class="top-row">
+        <div>
+          <div class="metric-label">Fraud Failed Booking <span class="info-icon">i</span></div>
+          <div style="display:flex;gap:16px;margin-top:4px;">
+            <div>
+              <div style="font-size:10px;color:#888;">Low Fraud Score</div>
+              <div style="font-size:20px;font-weight:700;">0</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#888;">High Fraud Score</div>
+              <div style="font-size:20px;font-weight:700;">0</div>
+            </div>
+          </div>
+          <div class="metric-change up" style="margin-top:4px;">▲ 100.00% vs last year</div>
+        </div>
+        <div class="icon-box red">🔒</div>
+      </div>
+      <button class="view-insights" style="margin-top:8px;width:fit-content;">View Insights</button>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Top 5 Organizations By Booking
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:160px;">
+        <canvas id="orgBookingChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Channel-Wise Breakdown
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:160px;">
+        <canvas id="channelBookingChart"></canvas>
+      </div>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#00acc1;"></span> B2C</span>
+        <span><span class="legend-dot" style="background:#f9a825;"></span> Corporate</span>
+        <span><span class="legend-dot" style="background:#ef5350;"></span> Reseller</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Online vs Offline
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#2e7d32;"></span> Online</span>
+            <span><span class="legend-dot" style="background:#c62828;"></span> Offline</span>
+          </div>
+          <button class="view-insights">View Insights</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:110px;">
+        <canvas id="onlineOfflineBookChart"></canvas>
+      </div>
+      <div style="font-size:11px;color:#888;margin-top:4px;">Total Bookings</div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Domestic vs International
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#aaa;"></span> Domestic</span>
+            <span><span class="legend-dot" style="background:#f9a825;"></span> International</span>
+          </div>
+          <button class="view-insights">View Insights</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:110px;">
+        <canvas id="domIntlBookChart"></canvas>
+      </div>
+      <div style="font-size:11px;color:#888;margin-top:4px;">Total Bookings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 3: BOOKING TRENDS ===== -->
+<div id="tab-trends" class="tab-content">
+  <!-- Highlight row -->
+  <div class="trend-highlight-row">
+    <div class="highlight-card">
+      <div class="hl-label">Most Booked Airline</div>
+      <div class="hl-value" style="font-size:18px;font-weight:800;">Qatar Airways (QR)</div>
+    </div>
+    <div class="highlight-card">
+      <div class="hl-label">Most Chosen Route</div>
+      <div class="route-box">
+        <div>
+          <div style="font-size:18px;">📍</div>
+          <div class="route-city">DXB</div>
+        </div>
+        <div class="route-icon">✈</div>
+        <div>
+          <div style="font-size:18px;">📍</div>
+          <div class="route-city">LHR</div>
+        </div>
+      </div>
+    </div>
+    <div class="stopover-box">
+      <div>
+        <div class="sv orange">642</div>
+        <div class="sl">Total Stopover Flights</div>
+      </div>
+      <div class="divider">
+        <div class="sv blue" style="padding-left:10px;">3,481</div>
+        <div class="sl">Total Direct Flights</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Ancillary Distribution
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:150px;">
+        <canvas id="ancillaryChart"></canvas>
+      </div>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#1565c0;"></span> Meal</span>
+        <span><span class="legend-dot" style="background:#f9a825;"></span> Seat</span>
+        <span><span class="legend-dot" style="background:#00acc1;"></span> Baggage</span>
+        <span><span class="legend-dot" style="background:#ef5350;"></span> Unknown</span>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Booking Patterns By Time Slot
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:150px;">
+        <canvas id="timeSlotChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card charts-row-full">
+    <div class="chart-card-title">Daily Booking Trend</div>
+    <div class="chart-container" style="height:180px;">
+      <canvas id="dailyTrendChart"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card charts-row-full">
+    <div class="chart-card-title">Booking Breakdown By Status</div>
+    <div class="chart-container" style="height:160px;">
+      <canvas id="statusChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 2 trends -->
+  <div class="charts-row" style="margin-top:10px;">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Weekday-Wise Booking
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:150px;">
+        <canvas id="weekdayChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        LCC vs FSC
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:150px;">
+        <canvas id="lccFscChart"></canvas>
+      </div>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#1565c0;"></span> GDS</span>
+        <span><span class="legend-dot" style="background:#f9a825;"></span> LCC</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card charts-row-full" style="margin-bottom:10px;">
+    <div class="chart-card-title">
+      Supplier-Wise Airline
+      <div style="display:flex;gap:6px;">
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+        <button class="view-insights">View Insights</button>
+      </div>
+    </div>
+    <div class="chart-container" style="height:150px;">
+      <canvas id="supplierAirlineChart"></canvas>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card" style="grid-column: 1 / -1;">
+      <div class="chart-card-title" style="flex-wrap:wrap;gap:8px;">
+        <span style="font-size:13px;font-weight:700;color:#1a237e;">Provider Profile-Wise Performance</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <!-- Market Profile Filter -->
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="font-size:11px;color:#555;white-space:nowrap;">Market Profile:</label>
+            <select id="providerMarketFilter" onchange="updateProviderChart()" style="font-size:11px;padding:3px 6px;border:1px solid #ccc;border-radius:3px;color:#333;background:white;cursor:pointer;">
+              <option value="all">All Markets</option>
+              <option value="domestic">Domestic</option>
+              <option value="international">International</option>
+              <option value="gcc">GCC Region</option>
+              <option value="europe">Europe</option>
+            </select>
+          </div>
+          <!-- Date Range Filter -->
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="font-size:11px;color:#555;white-space:nowrap;">From:</label>
+            <input type="date" id="providerDateFrom" value="2026-02-01" onchange="updateProviderChart()" style="font-size:11px;padding:3px 5px;border:1px solid #ccc;border-radius:3px;color:#333;">
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="font-size:11px;color:#555;white-space:nowrap;">To:</label>
+            <input type="date" id="providerDateTo" value="2026-03-07" onchange="updateProviderChart()" style="font-size:11px;padding:3px 5px;border:1px solid #ccc;border-radius:3px;color:#333;">
+          </div>
+          <!-- Metric Toggle -->
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="provBtnBookings" onclick="switchProviderMetric('bookings',this)">Bookings</button>
+            <button class="toggle-btn" id="provBtnSales" onclick="switchProviderMetric('sales',this)">Sales</button>
+          </div>
+        </div>
+      </div>
+      <!-- Summary pills -->
+      <div id="providerSummary" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;"></div>
+      <!-- Chart -->
+      <div style="position:relative;height:200px;">
+        <canvas id="providerProfileChart"></canvas>
+      </div>
+      <!-- Legend -->
+      <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;">
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555;"><span style="width:12px;height:12px;border-radius:2px;background:#1565c0;display:inline-block;"></span>Amadeus</span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555;"><span style="width:12px;height:12px;border-radius:2px;background:#f9a825;display:inline-block;"></span>Galileo</span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555;"><span style="width:12px;height:12px;border-radius:2px;background:#00acc1;display:inline-block;"></span>Sabre</span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555;"><span style="width:12px;height:12px;border-radius:2px;background:#e65100;display:inline-block;"></span>Worldspan</span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555;"><span style="width:12px;height:12px;border-radius:2px;background:#6a1b9a;display:inline-block;"></span>Abacus</span>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Pax-Wise Distribution
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:130px;">
+        <canvas id="paxChart"></canvas>
+      </div>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#1565c0;"></span> ADULT</span>
+        <span><span class="legend-dot" style="background:#f9a825;"></span> Adult</span>
+        <span><span class="legend-dot" style="background:#90caf9;"></span> Child</span>
+        <span><span class="legend-dot" style="background:#ef5350;"></span> CHILD</span>
+        <span><span class="legend-dot" style="background:#2e7d32;"></span> Infant</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-row" style="margin-top:10px;">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Trip-Wise Booking
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:130px;">
+        <canvas id="tripWiseChart"></canvas>
+      </div>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#1565c0;"></span> One Way</span>
+        <span><span class="legend-dot" style="background:#ef5350;"></span> Round Trip</span>
+        <span><span class="legend-dot" style="background:#f9a825;"></span> Multiple Cities</span>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">
+        Cabin-Wise Booking
+        <div class="toggle-group">
+          <button class="toggle-btn active">Bookings</button>
+          <button class="toggle-btn">Sales</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height:130px;">
+        <canvas id="cabinChart"></canvas>
+      </div>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#1a237e;"></span> Economy class</span>
+        <span><span class="legend-dot" style="background:#f9a825;"></span> Business class</span>
+        <span><span class="legend-dot" style="background:#4dd0e1;"></span> Premium Economy</span>
+        <span><span class="legend-dot" style="background:#ef5350;"></span> First Class</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== SPARKLINES ==========
+function makeSparkline(id, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const data = Array.from({length: 20}, () => Math.random() * 60 + 20);
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map((_,i)=>i),
+      datasets: [{
+        data,
+        borderColor: color || '#ef5350',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: false,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { display: false }, y: { display: false } },
+      animation: false,
+      events: []
+    }
+  });
+  // Set explicit pixel size
+  const canvas = document.getElementById(id);
+  canvas.width = canvas.parentElement.offsetWidth || 200;
+  canvas.height = 36;
+}
+makeSparkline('spark1'); makeSparkline('spark2'); makeSparkline('spark3'); makeSparkline('spark4');
+
+// ========== FINANCIAL CHARTS ==========
+// Org Revenue Bar
+new Chart(document.getElementById('orgRevenueChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Alpha Tech Solutions','Meridian Travel Co.','Skylink Enterprises','Neptune Freight Fwd','Coastline Air Mgmt'],
+    datasets: [{ data: [178400, 134600, 89200, 67300, 54800], backgroundColor: '#1565c0', borderRadius: 2, barThickness: 14 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, datalabels: { display: false } },
+    scales: {
+      x: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v } },
+      y: { ticks: { font: { size: 9 } } }
+    }
+  }
+});
+
+// Channel Donut
+new Chart(document.getElementById('channelChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['B2C', 'Corporate', 'Reseller'],
+    datasets: [{ data: [91, 7, 2], backgroundColor: ['#1565c0', '#f9a825', '#aaa'], borderWidth: 2 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    cutout: '68%'
+  }
+});
+
+// Online vs Offline bar
+new Chart(document.getElementById('onlineOfflineChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Online', 'Offline'],
+    datasets: [{ data: [1840000, 530000], backgroundColor: ['#2e7d32', '#c62828'], borderRadius: 3, barThickness: 22 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { font: { size: 9 }, callback: v => (v/1000000).toFixed(1)+'M' } }, y: { ticks: { font: { size: 10 } } } }
+  }
+});
+
+// Domestic vs International bar
+new Chart(document.getElementById('domIntlChart'), {
+  type: 'bar',
+  data: {
+    labels: ['International', 'Domestic'],
+    datasets: [{ data: [1920000, 48000], backgroundColor: ['#f9a825', '#bdbdbd'], borderRadius: 3, barThickness: 22 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { font: { size: 9 }, callback: v => (v/1000000).toFixed(1)+'M' } }, y: { ticks: { font: { size: 10 } } } }
+  }
+});
+
+// ========== BOOKING OVERVIEW CHARTS ==========
+new Chart(document.getElementById('orgBookingChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Alpha Tech Solutions','Meridian Travel Co.','Coastline Air Mgmt','Neptune Freight Fwd','Skylink Enterprises'],
+    datasets: [{ data: [1840, 614, 537, 492, 341], backgroundColor: '#1565c0', borderRadius: 2, barThickness: 14 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } },
+      y: { ticks: { font: { size: 9 } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('channelBookingChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['B2C', 'Corporate', 'Reseller'],
+    datasets: [{ data: [87, 10, 3], backgroundColor: ['#00acc1', '#f9a825', '#ef5350'], borderWidth: 2 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '68%' }
+});
+
+new Chart(document.getElementById('onlineOfflineBookChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Online', 'Offline'],
+    datasets: [{ data: [9800, 2600], backgroundColor: ['#2e7d32', '#c62828'], borderRadius: 3, barThickness: 22 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } }, y: { ticks: { font: { size: 10 } } } }
+  }
+});
+
+new Chart(document.getElementById('domIntlBookChart'), {
+  type: 'bar',
+  data: {
+    labels: ['International', 'Domestic'],
+    datasets: [{ data: [14700, 120], backgroundColor: ['#f9a825', '#bdbdbd'], borderRadius: 3, barThickness: 22 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } }, y: { ticks: { font: { size: 10 } } } }
+  }
+});
+
+// ========== TRENDS CHARTS ==========
+new Chart(document.getElementById('ancillaryChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Meal', 'Seat', 'Baggage', 'Unknown'],
+    datasets: [{ data: [31, 27, 21, 21], backgroundColor: ['#1565c0', '#f9a825', '#00acc1', '#ef5350'], borderWidth: 2 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '60%' }
+});
+
+new Chart(document.getElementById('timeSlotChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Morning', 'Afternoon', 'Evening', 'Late Night'],
+    datasets: [{ data: [3100, 890, 430, 4200], backgroundColor: '#00acc1', borderRadius: 3, barThickness: 20 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } }, y: { ticks: { font: { size: 10 } } } }
+  }
+});
+
+new Chart(document.getElementById('dailyTrendChart'), {
+  type: 'line',
+  data: {
+    labels: ['2026-02-26','2026-02-27','2026-02-28','2026-03-01','2026-03-02','2026-03-03','2026-03-04','2026-03-05','2026-03-06','2026-03-07'],
+    datasets: [{
+      data: [489, 572, 318, 441, 267, 198, 244, 219, 183, 72],
+      borderColor: '#f9a825', backgroundColor: 'rgba(249,168,37,0.08)',
+      borderWidth: 2, pointRadius: 4, tension: 0.4, fill: true
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } }
+  }
+});
+
+new Chart(document.getElementById('statusChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Ticketed', 'Changed', 'Cancelled', 'Discarded', 'Reserved'],
+    datasets: [{ data: [12400, 1309, 1384, 80, 60], backgroundColor: '#1565c0', borderRadius: 3 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { font: { size: 10 } } },
+      y: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } }
+    }
+  }
+});
+
+new Chart(document.getElementById('weekdayChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    datasets: [{ data: [841, 1920, 2100, 2050, 2780, 1620, 1590], backgroundColor: '#ef5350', borderRadius: 3 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { font: { size: 9 } } },
+      y: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } }
+    }
+  }
+});
+
+new Chart(document.getElementById('lccFscChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['GDS', 'LCC'],
+    datasets: [{ data: [56, 44], backgroundColor: ['#1565c0', '#f9a825'], borderWidth: 2 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '60%' }
+});
+
+new Chart(document.getElementById('supplierAirlineChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Qatar Airways', 'Turkish Airlines', 'Flydubai', 'Etihad Airways', 'Air Arabia', 'Wizz Air', 'Oman Air'],
+    datasets: [{ data: [3820, 1780, 1340, 514, 287, 114, 29], backgroundColor: '#f9a825', borderRadius: 3 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { font: { size: 9 } } },
+      y: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } }
+    }
+  }
+});
+
+new Chart(document.getElementById('paxChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['ADULT', 'Adult', 'Child', 'CHILD', 'Infant'],
+    datasets: [{ data: [62, 26, 5, 5, 2], backgroundColor: ['#1565c0', '#f9a825', '#90caf9', '#ef5350', '#2e7d32'], borderWidth: 2 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '58%' }
+});
+
+new Chart(document.getElementById('tripWiseChart'), {
+  type: 'bar',
+  data: {
+    labels: ['One Way', 'Round Trip', 'Multiple Cities'],
+    datasets: [
+      { data: [8400, 0, 0], backgroundColor: '#1565c0', borderRadius: 3, barThickness: 18 },
+      { data: [0, 4700, 0], backgroundColor: '#ef5350', borderRadius: 3, barThickness: 18 },
+      { data: [0, 0, 195], backgroundColor: '#f9a825', borderRadius: 3, barThickness: 18 }
+    ]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { stacked: false, ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } },
+      y: { ticks: { font: { size: 10 } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('cabinChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Economy Class', 'Business Class', 'Economy class', 'Premium Economy', 'First Class', 'Business class'],
+    datasets: [{ data: [3600, 287, 68, 32, 23, 8], backgroundColor: ['#1a237e','#f9a825','#1565c0','#4dd0e1','#ef5350','#80cbc4'], borderRadius: 3, barThickness: 14 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { font: { size: 9 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } },
+      y: { ticks: { font: { size: 9 } } }
+    }
+  }
+});
+
+// ========== PROVIDER PROFILE CHART ==========
+const providerData = {
+  bookings: {
+    all:           { Amadeus: [820,740,910,680,760,850,920,810,870,640], Galileo: [430,510,390,470,540,420,500,460,480,390], Sabre: [310,280,340,290,320,360,300,270,330,250], Worldspan: [180,210,160,190,220,170,200,150,230,140], Abacus: [90,110,80,100,120,85,95,75,105,65] },
+    domestic:      { Amadeus: [320,290,370,260,310,340,380,300,350,240], Galileo: [170,200,150,180,210,160,190,140,180,130], Sabre: [110,95,125,100,115,130,108,92,118,88], Worldspan: [60,72,55,65,78,58,68,50,75,45], Abacus: [30,38,26,34,42,28,32,24,36,20] },
+    international: { Amadeus: [500,450,540,420,450,510,540,510,520,400], Galileo: [260,310,240,290,330,260,310,320,300,260], Sabre: [200,185,215,190,205,230,192,178,212,162], Worldspan: [120,138,105,125,142,112,132,100,155,95], Abacus: [60,72,54,66,78,57,63,51,69,45] },
+    gcc:           { Amadeus: [410,370,455,340,380,425,460,405,435,320], Galileo: [215,255,195,235,270,210,250,230,245,210], Sabre: [155,140,170,145,160,180,150,135,165,125], Worldspan: [88,104,80,95,108,84,100,76,115,72], Abacus: [44,54,40,50,60,43,47,38,52,34] },
+    europe:        { Amadeus: [280,250,305,235,255,290,310,285,295,225], Galileo: [145,170,130,155,180,140,165,155,160,140], Sabre: [110,100,120,102,112,128,106,95,116,90], Worldspan: [65,77,58,70,80,62,74,56,82,52], Abacus: [32,40,28,36,44,31,35,27,38,24] }
+  },
+  sales: {
+    all:           { Amadeus: [142000,128000,158000,118000,132000,147000,160000,140000,151000,111000], Galileo: [74000,88000,67000,81000,93000,72000,86000,79000,83000,67000], Sabre: [53000,48000,58000,50000,55000,62000,52000,46000,57000,43000], Worldspan: [31000,36000,27000,32000,38000,29000,34000,26000,40000,24000], Abacus: [15000,19000,13000,17000,21000,14000,16000,13000,18000,11000] },
+    domestic:      { Amadeus: [55000,50000,64000,45000,53000,58000,66000,52000,60000,41000], Galileo: [29000,34000,26000,31000,36000,27000,32000,24000,31000,22000], Sabre: [19000,16000,21000,17000,20000,22000,18000,16000,20000,15000], Worldspan: [10000,12000,9000,11000,13000,10000,11000,9000,13000,8000], Abacus: [5000,6500,4500,5800,7200,4800,5500,4200,6200,3500] },
+    international: { Amadeus: [87000,78000,94000,73000,79000,89000,94000,88000,91000,70000], Galileo: [45000,54000,41000,50000,57000,45000,54000,55000,52000,45000], Sabre: [34000,32000,37000,33000,35000,40000,34000,30000,37000,28000], Worldspan: [21000,24000,18000,21000,25000,19000,23000,17000,27000,16000], Abacus: [10000,12500,8500,11200,13800,9200,10500,8800,11800,7500] },
+    gcc:           { Amadeus: [71000,64000,79000,59000,66000,74000,80000,70000,76000,55000], Galileo: [37000,44000,34000,41000,47000,36000,43000,40000,43000,36000], Sabre: [27000,24000,30000,25000,27000,31000,26000,23000,29000,22000], Worldspan: [15000,18000,14000,16000,19000,14000,17000,13000,20000,12000], Abacus: [7500,9500,6800,8500,10500,7200,8000,6500,9000,5800] },
+    europe:        { Amadeus: [48000,43000,53000,40000,44000,51000,54000,49000,51000,39000], Galileo: [25000,29000,22000,27000,32000,24000,28000,27000,28000,24000], Sabre: [19000,17000,20000,17000,19000,22000,18000,16000,20000,15000], Worldspan: [11000,13000,10000,11000,14000,10000,13000,9000,14000,9000], Abacus: [5500,6800,4800,6100,7500,5300,6000,4700,6500,4200] }
+  }
+};
+const providerLabels = ['Feb 26','Feb 27','Feb 28','Mar 1','Mar 2','Mar 3','Mar 4','Mar 5','Mar 6','Mar 7'];
+const providerColors = { Amadeus: '#1565c0', Galileo: '#f9a825', Sabre: '#00acc1', Worldspan: '#e65100', Abacus: '#6a1b9a' };
+
+let providerMetric = 'bookings';
+let providerChartInst = null;
+
+function buildProviderSummary(market) {
+  const d = providerData[providerMetric][market];
+  const container = document.getElementById('providerSummary');
+  container.innerHTML = Object.entries(d).map(([name, vals]) => {
+    const total = vals.reduce((a,b)=>a+b,0);
+    const fmt = providerMetric === 'sales' ? (total>=1000000?(total/1000000).toFixed(1)+'M':(total/1000).toFixed(0)+'K') : total.toLocaleString();
+    return `<div style="background:#f0f4ff;border:1px solid #c5cae9;border-radius:4px;padding:4px 10px;display:flex;flex-direction:column;align-items:center;">
+      <span style="font-size:10px;color:#555;">${name}</span>
+      <span style="font-size:13px;font-weight:700;color:${providerColors[name]};">${fmt}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateProviderChart() {
+  const market = document.getElementById('providerMarketFilter').value;
+  const d = providerData[providerMetric][market];
+  buildProviderSummary(market);
+
+  const datasets = Object.entries(d).map(([name, vals]) => ({
+    label: name,
+    data: vals,
+    backgroundColor: providerColors[name] + 'cc',
+    borderColor: providerColors[name],
+    borderWidth: 1.5,
+    borderRadius: 4,
+    borderSkipped: false
+  }));
+
+  if (providerChartInst) {
+    providerChartInst.data.datasets = datasets;
+    providerChartInst.update();
+    return;
+  }
+
+  const ctx = document.getElementById('providerProfileChart').getContext('2d');
+  providerChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: providerLabels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const v = ctx.raw;
+              return ` ${ctx.dataset.label}: ${providerMetric==='sales'? 'USD '+(v>=1000?(v/1000).toFixed(1)+'K':v) : v.toLocaleString()}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#f0f0f0' },
+          ticks: { font: { size: 10 }, color: '#555' }
+        },
+        y: {
+          grid: { color: '#f0f0f0' },
+          ticks: {
+            font: { size: 10 }, color: '#555',
+            callback: v => providerMetric==='sales' ? (v>=1000?(v/1000).toFixed(0)+'K':v) : (v>=1000?(v/1000).toFixed(1)+'K':v)
+          }
+        }
+      }
+    }
+  });
+}
+
+function switchProviderMetric(metric, btn) {
+  providerMetric = metric;
+  document.getElementById('provBtnBookings').classList.toggle('active', metric==='bookings');
+  document.getElementById('provBtnSales').classList.toggle('active', metric==='sales');
+  updateProviderChart();
+}
+
+updateProviderChart();
+
+
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
